@@ -1,10 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using FakeXiecheng.API.Database;
+﻿using FakeXiecheng.API.Database;
 using FakeXiecheng.API.Models;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace FakeXiecheng.API.Services
 {
@@ -22,10 +21,38 @@ namespace FakeXiecheng.API.Services
             return _context.TouristRoutes.Include(t =>t.TouristRoutePictures).FirstOrDefault(n=> n.Id == touristRouteId);
         }
 
-        public IEnumerable<TouristRoute> GetTouristRoutes()
+        public IEnumerable<TouristRoute> GetTouristRoutes(string keyword, 
+            string ratingOperator, int? ratingValue)
         {
-            return _context.TouristRoutes.Include(t => t.TouristRoutePictures);
+            IQueryable<TouristRoute> result = _context.TouristRoutes.Include(t => t.TouristRoutePictures);
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                keyword = keyword.Trim();
+                result = result.Where(t => t.Title.Contains(keyword));
+            }
+
+            if (ratingValue >=0)
+            {
+                switch (ratingOperator)
+                {
+                    case "largerThan":
+                        result = result.Where(t => t.Rating >= ratingValue);
+                        break;
+                    case "lessThan":
+                        result = result.Where(t => t.Rating <= ratingValue);
+                        break;
+                    case "equalTo":
+                        result = result.Where(t => t.Rating == ratingValue);
+                        break;
+                }
+            }
+            return result.ToList();
         }
+
+        //public IEnumerable<TouristRoute> GetTouristRoutes()
+        //{
+        //    return _context.TouristRoutes.Include(t => t.TouristRoutePictures);
+        //}
 
         public bool TouristRouteExists(Guid touristRouteId)
         {
@@ -40,6 +67,37 @@ namespace FakeXiecheng.API.Services
         public TouristRoutePicture GetPicture(int pictureId)
         {
             return _context.TouristRoutePictures.Where(p => p.Id == pictureId).FirstOrDefault();
+        }
+
+        public void AddTouristRoute(TouristRoute touristRoute)
+        {
+            if (touristRoute == null)
+            {
+                throw new ArgumentNullException(nameof(touristRoute));
+            }
+
+            _context.TouristRoutes.Add(touristRoute);
+        }
+
+        public void AddTouristRoutePicture(Guid touristRouteId, TouristRoutePicture touristRoutePicture)
+        {
+            if (touristRouteId == Guid.Empty)
+            {
+                throw new ArgumentNullException(nameof(touristRouteId));
+            }
+
+            if (touristRoutePicture == null)
+            {
+                throw new ArgumentNullException(nameof(touristRoutePicture));
+            }
+
+            touristRoutePicture.TouristRouteId = touristRouteId;
+            _context.TouristRoutePictures.Add(touristRoutePicture);
+        }
+
+        public bool Save()
+        {
+            return (_context.SaveChanges()>=0);
         }
     }
 }
