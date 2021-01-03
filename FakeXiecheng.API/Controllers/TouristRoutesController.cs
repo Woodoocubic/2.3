@@ -74,5 +74,26 @@ namespace FakeXiecheng.API.Controllers
                 new {touristRouteId = touristRouteToReturn.Id},
                 touristRouteToReturn);
         }
+
+        [HttpPut("{touristRouteId}")]
+        public IActionResult UpdateTouristRoute(
+            [FromRoute] Guid touristRouteId,
+            [FromBody] TouristRouteForUpdateDto touristRouteForUpdateDto
+            )
+        {
+            if (! _touristRouteRepository.TouristRouteExists(touristRouteId))
+            {
+                return NotFound("Cannot find the tourist route");
+            }
+
+            var touristRouteFromRepo = _touristRouteRepository.GetTouristRoute(touristRouteId);
+            //1. 映射Dto
+            //2. 更新dto
+            //3. 映射model
+            _mapper.Map(touristRouteForUpdateDto, touristRouteFromRepo);
+            _touristRouteRepository.Save();
+
+            return NoContent();
+        }
     }
 }
