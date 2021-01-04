@@ -5,11 +5,13 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AutoMapper;
 using FakeXiecheng.API.Dtos;
+using FakeXiecheng.API.Helpers;
 using FakeXiecheng.API.Models;
 using FakeXiecheng.API.ResourceParameters;
 using FakeXiecheng.API.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 
 namespace FakeXiecheng.API.Controllers
@@ -95,5 +97,60 @@ namespace FakeXiecheng.API.Controllers
 
             return NoContent();
         }
+
+        [HttpPatch("{touristRouteId}")]
+        public IActionResult PartiallyUpdateTouristRoute(
+            [FromRoute]Guid touristRouteId,
+            [FromBody] JsonPatchDocument<TouristRouteForUpdateDto> patchDocument)
+        {
+            if (!_touristRouteRepository.TouristRouteExists(touristRouteId))
+            {
+                return NotFound("tourist route cannot find");
+            }
+
+            var touristRouteFromRepo = _touristRouteRepository.GetTouristRoute(touristRouteId);
+            var touristRouteToPatch = _mapper.Map<TouristRouteForUpdateDto>(touristRouteFromRepo);
+            patchDocument.ApplyTo(touristRouteToPatch, ModelState);
+            if (TryValidateModel(touristRouteToPatch))
+            {
+                return ValidationProblem(ModelState);
+            }
+            _mapper.Map(touristRouteToPatch, touristRouteFromRepo);
+            _touristRouteRepository.Save();
+
+            return NoContent();
+        }
+        [HttpDelete("{touristRouteId}")]
+        public IActionResult DeleteTouristRoute([FromRoute] Guid touristRouteId)
+        {
+            if (! _touristRouteRepository.TouristRouteExists(touristRouteId))
+            {
+                return NotFound("the tourist route does not exist");
+            }
+
+            var touristRoute = _touristRouteRepository.GetTouristRoute(touristRouteId);
+            _touristRouteRepository.DeleteTouristRoute(touristRoute);
+            _touristRouteRepository.Save();
+
+            return NoContent();
+        }
+
+        [HttpDelete("({touristIDs})")]
+        public IActionResult DeleteByIDs(
+            [ModelBinder(BinderType = typeof(ArrayModelBinder))]
+            [FromRoute] IEnumerable<Guid> touristIDs)
+        {
+            if (touristIDs == null)
+            {
+                return BadRequest();
+            }
+
+            var touristRoutesFromRepo = _touristRouteRepository.GetTouristRoutesByIDList(touristIDs);
+            _touristRouteRepository.DeleteTouristRoutes(touristRoutesFromRepo);
+            _touristRouteRepository.Save();
+
+            return NoContent();
+        }
     }
 }
+ 

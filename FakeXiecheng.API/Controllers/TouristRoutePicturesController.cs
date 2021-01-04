@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using FakeXiecheng.API.Dtos;
+using FakeXiecheng.API.Helpers;
 using FakeXiecheng.API.Models;
 using FakeXiecheng.API.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -86,6 +87,22 @@ namespace FakeXiecheng.API.Controllers
                 },
                 pictureToReturn
                 );
+        }
+
+        [HttpDelete("{pictureId}")]
+        public IActionResult DeletePicture([FromRoute]Guid touristRouteId, 
+            [FromRoute] int pictureId)
+        {
+            if (!_touristRouteRepository.TouristRouteExists(touristRouteId))
+            {
+                return NotFound("the tourist route does not exist");
+            }
+
+            var picture = _touristRouteRepository.GetPicture(pictureId);
+            _touristRouteRepository.DeleteTouristRoutePicture(picture);
+            _touristRouteRepository.Save();
+
+            return NoContent();
         }
     }
 }
