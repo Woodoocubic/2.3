@@ -7,18 +7,26 @@ using System.Threading.Tasks;
 
 namespace FakeXiecheng.API.Models
 {
+    public enum OrderStateEnum
+    {
+        Pending, //订单已经生产
+        Processing, //支付处理中
+        Completed, //交易成功
+        Declined, //交易失败
+        Cancelled, //订单取消
+        Refund, //已退款
+    }
     public class Order
     {
         [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int Id { get; set; }
-        [ForeignKey("TouristRouteId")]
-        public Guid TouristRouteId { get; set; }
-        public TouristRoute TouristRoute { get; set; }
-        public Guid? ShoppingCartId { get; set; }
-        [Column(TypeName = "decimal(18,2)")]
-        public decimal OriginalPrice { get; set; }
-        [Range(0.0, 1.0)]
-        public double? DiscountPresent { get; set; }
+        public Guid Id { get; set; }
+
+        public string UserId { get; set; }
+        public ApplicationUser User { get; set; }
+        public ICollection<LineItem> OrderItems { get; set; }
+        public OrderStateEnum State { get; set; }
+        public DateTime CreateDateUTC { get; set; }
+        public string TransactionMetadata { get; set; }
     }
 }
+ 
