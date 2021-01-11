@@ -4,7 +4,9 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using AutoMapper;
+using AutoMapper.Configuration.Conventions;
 using FakeXiecheng.API.Dtos;
+using FakeXiecheng.API.Helpers;
 using FakeXiecheng.API.Models;
 using FakeXiecheng.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -39,17 +41,74 @@ namespace FakeXiecheng.API.Controllers
 
             //2. get shopping cart with userId
             var shoppingCart = await _touristRouteRepository.GetShoppingCartByUserId(userId);
+ 
+            return Ok(_mapper.Map<ShoppingCartDto>(shoppingCart));
+        }
+
+        [HttpPost("items")]
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        public async Task<IActionResult> AddShoppingCartItem(
+            [FromBody] AddShoppingCartItemDto addShoppingCartItemDto
+        )
+        {
+            //1.get the current user
+            var userId = _httpContextAccessor.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value;
+
+            //2 use the userId to get shoppingcart
+            var shoppingCart = await _touristRouteRepository.GetShoppingCartByUserId(userId);
+            //3. create line item
+            var touristRoute =
+                await _touristRouteRepository.GetTouristRouteAsync(addShoppingCartItemDto.TouristRouteId);
+
+            if (touristRoute == null)
+            {
+                return NotFound("tourist route does not exist");
+            }
+
+            var lineItem = new LineItem()
+            {
+                TouristRouteId = addShoppingCartItemDto.TouristRouteId,
+                ShoppingCartId = shoppingCart.Id,
+                OriginalPrice = touristRoute.OriginalPrice,
+                DiscountPresent = touristRoute.DiscountPrice
+            };
+
+            //4. add lineItem, save data to database
+            await _touristRouteRepository.AddShoppingCartItem(lineItem);
+            await _touristRouteRepository.SaveAsync();
 
             return Ok(_mapper.Map<ShoppingCartDto>(shoppingCart));
         }
 
-        [HttpPost("itmes")]
+        [HttpDelete("items/{itemId}")]
         [Authorize(AuthenticationSchemes = "Bearer")]
-        public async Task<IActionResult> AddShoppingCartItem([FromBody]
-            
+        public async Task<IActionResult> DeleteShoppingCartItem([FromRoute] int itemId)
+        {
+            //1. get lineItem data
+            var lineItem = await _touristRouteRepository.GetShoppingCartItemByItemId(itemId);
+            if (lineItem == null)
+            {
+                return NotFound("can not find item in the shopping cart");
+            }
+            _touristRouteRepository.DeleteShoppingCartItem(lineItem);
+            await _touristRouteRepository.SaveAsync();
+
+            return NoContent();
+        }
+
+        [HttpDelete("items/({itemIDs})")]
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        public async Task<IActionResult> RemoveShoppingCartItems(
+            [ModelBinder(BinderType = typeof(ArrayModelBinder))]
+            [FromRoute] IEnumerable<int> itemIDs
             )
         {
+            var lineItems = await _touristRouteRepository
+                .GetShoppingCartsByIdListAsync(itemIDs);
+            _touristRouteRepository.DeleteShoppingCartItems(lineItems);
+            await _touristRouteRepository.SaveAsync();
 
+            return NoContent();
         }
     }
 }
