@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using FakeXiecheng.API.Helpers;
 
 namespace FakeXiecheng.API.Services
 {
@@ -24,8 +25,8 @@ namespace FakeXiecheng.API.Services
                 .FirstOrDefaultAsync(n=> n.Id == touristRouteId);
         }
 
-        public async Task<IEnumerable<TouristRoute>> GetTouristRoutesAsync(string keyword, 
-            string ratingOperator, int? ratingValue)
+        public async Task<PaginationList<TouristRoute>> GetTouristRoutesAsync(string keyword, 
+            string ratingOperator, int? ratingValue, int pageSize, int pageNumber)
         {
             IQueryable<TouristRoute> result = _context.TouristRoutes.Include(t => t.TouristRoutePictures);
             if (!string.IsNullOrWhiteSpace(keyword))
@@ -36,20 +37,15 @@ namespace FakeXiecheng.API.Services
 
             if (ratingValue >=0)
             {
-                switch (ratingOperator)
+                result = ratingOperator switch
                 {
-                    case "largerThan":
-                        result = result.Where(t => t.Rating >= ratingValue);
-                        break;
-                    case "lessThan":
-                        result = result.Where(t => t.Rating <= ratingValue);
-                        break;
-                    case "equalTo":
-                        result = result.Where(t => t.Rating == ratingValue);
-                        break;
-                }
+                    "largerThan" => result.Where(t => t.Rating >= ratingValue),
+                    "lessThan" => result.Where(t => t.Rating <= ratingValue),
+                    _ => result.Where(t => t.Rating == ratingValue),
+                };
             }
-            return await result.ToListAsync();
+            //include vs join
+            return await PaginationList<TouristRoute>.CreateAsync(pageNumber, pageSize, result);
         }
 
         public async Task<IEnumerable<TouristRoute>> GetTouristRoutesByIDListAsync(IEnumerable<Guid> ids)
@@ -155,6 +151,30 @@ namespace FakeXiecheng.API.Services
         {
             _context.LineItems.RemoveRange(lineItems);
         }
+
+        public async Task AddOrderAsync(Order order)
+        {
+            await _context.Orders.AddAsync(order);
+        }
+
+        public async Task<PaginationList<Order>> GetOrdersByUserId(
+            string userId, int pageSize, int pageNumber
+            )
+        {
+            //return await _context.Orders.Where(o => o.UserId == userId).ToListAsync();
+            IQueryable<Order> result = _context.Orders.Where(o => o.UserId == userId);
+            return await PaginationList<Order>.CreateAsync(pageNumber, pageSize, result);
+        }
+
+        public async Task<Order> GetOrderById(Guid orderId)
+        {
+            return await _context.Orders
+                .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.TouristRoute)
+                .Where(o => o.Id == orderId)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<bool> SaveAsync()
         {
             return (await _context.SaveChangesAsync()>=0);

@@ -12,6 +12,7 @@ using FakeXiecheng.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace FakeXiecheng.API.Controllers
 {
@@ -109,6 +110,32 @@ namespace FakeXiecheng.API.Controllers
             await _touristRouteRepository.SaveAsync();
 
             return NoContent();
+        }
+
+        [HttpPost("checkout")]
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        public async Task<IActionResult> Checkout()
+        {
+            //1.get current user
+            var userId = _httpContextAccessor
+                .HttpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value;
+            //2. get shopping cart items via userId
+            var shoppingCart = await _touristRouteRepository.GetShoppingCartByUserId(userId);
+            //3. create order
+            var order = new Order()
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                State = OrderStateEnum.Pending,
+                OrderItems = shoppingCart.ShoppingCartItems,
+                CreateDateUTC = DateTime.UtcNow
+            };
+            shoppingCart.ShoppingCartItems = null;
+            //4. save data
+            await _touristRouteRepository.AddOrderAsync(order);
+            await _touristRouteRepository.SaveAsync();
+            //5. return 
+            return Ok(_mapper.Map<OrderDto>(order));
         }
     }
 }
