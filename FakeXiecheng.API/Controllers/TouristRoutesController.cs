@@ -25,15 +25,18 @@ namespace FakeXiecheng.API.Controllers
         private readonly  ITouristRouteRepository _touristRouteRepository;
         private readonly IMapper _mapper;
         private readonly IUrlHelper _urlHelper;
+        private readonly IPropertyMappingService _propertyMappingService;
         public TouristRoutesController(
             ITouristRouteRepository touristRouteRepository,
             IMapper mapper,
             IUrlHelperFactory urlHelperFactory,
-            IActionContextAccessor actionContextAccessor)
+            IActionContextAccessor actionContextAccessor,
+            IPropertyMappingService propertyMappingService)
         {
             _touristRouteRepository = touristRouteRepository;
             _mapper = mapper;
             _urlHelper = urlHelperFactory.GetUrlHelper(actionContextAccessor.ActionContext);
+            _propertyMappingService = propertyMappingService;
         }
 
         private string GenerateTouristRouteResourceURL(
@@ -47,6 +50,7 @@ namespace FakeXiecheng.API.Controllers
                 ResourceUriType.PreviousPage => _urlHelper.Link("GetTouristRoutes",
                     new
                     {
+                        orderBy = parameters.OrderBy,
                         keyword = parameters.Keyword,
                         rating = parameters.Rating,
                         pageNumber = parameters2.PageNumber - 1,
@@ -55,6 +59,7 @@ namespace FakeXiecheng.API.Controllers
                 ResourceUriType.NextPage => _urlHelper.Link("GetTouristRoutes",
                     new
                     {
+                        orderBy = parameters.OrderBy,
                         keyword = parameters.Keyword,
                         rating = parameters.Rating,
                         pageNumber = parameters2.PageNumber + 1,
@@ -63,6 +68,7 @@ namespace FakeXiecheng.API.Controllers
                 _ => _urlHelper.Link("GetTouristRoutes", 
                     new
                     {
+                        orderBy = parameters.OrderBy,
                         keyword = parameters.Keyword,
                         rating = parameters.Rating,
                         pageNumber = parameters2.PageNumber,
@@ -80,6 +86,11 @@ namespace FakeXiecheng.API.Controllers
             //string rating //lessThan, largerThan, equalTo
             )//fromquery or frombody
         {
+            if (!_propertyMappingService.IsMappingExists<TouristRouteDto, TouristRoute>(paramaters.OrderBy))
+            {
+                return BadRequest("please input the right orderby parameters");
+            }
+
             var touristRoutesFromRepo 
                 = await _touristRouteRepository
                 .GetTouristRoutesAsync(
@@ -87,7 +98,8 @@ namespace FakeXiecheng.API.Controllers
                     paramaters.RatingOperator, 
                     paramaters.RatingValue,
                     paramaters2.PageSize,
-                    paramaters2.PageNumber);
+                    paramaters2.PageNumber,
+                    paramaters.OrderBy);
             if (touristRoutesFromRepo == null || !touristRoutesFromRepo.Any())
             {
                 return NotFound("no tourist route");

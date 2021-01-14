@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using FakeXiecheng.API.Dtos;
 using FakeXiecheng.API.Helpers;
 
 namespace FakeXiecheng.API.Services
@@ -12,10 +13,15 @@ namespace FakeXiecheng.API.Services
     public class TouristRouteRepository: ITouristRouteRepository
     {
         private readonly AppDbContext _context;
+        private readonly IPropertyMappingService _propertyMappingService;
 
-        public TouristRouteRepository(AppDbContext appDbContext)
+        public TouristRouteRepository(
+            AppDbContext appDbContext,
+            IPropertyMappingService propertyMappingService
+            )
         {
             _context = appDbContext;
+            _propertyMappingService = propertyMappingService;
         }
 
         public async Task<TouristRoute> GetTouristRouteAsync(Guid touristRouteId)
@@ -25,8 +31,14 @@ namespace FakeXiecheng.API.Services
                 .FirstOrDefaultAsync(n=> n.Id == touristRouteId);
         }
 
-        public async Task<PaginationList<TouristRoute>> GetTouristRoutesAsync(string keyword, 
-            string ratingOperator, int? ratingValue, int pageSize, int pageNumber)
+        public async Task<PaginationList<TouristRoute>> GetTouristRoutesAsync(
+            string keyword, 
+            string ratingOperator, 
+            int? ratingValue, 
+            int pageSize, 
+            int pageNumber, 
+            string orderBy
+            )
         {
             IQueryable<TouristRoute> result = _context.TouristRoutes.Include(t => t.TouristRoutePictures);
             if (!string.IsNullOrWhiteSpace(keyword))
@@ -43,6 +55,13 @@ namespace FakeXiecheng.API.Services
                     "lessThan" => result.Where(t => t.Rating <= ratingValue),
                     _ => result.Where(t => t.Rating == ratingValue),
                 };
+            }
+
+            if (!string.IsNullOrWhiteSpace(orderBy))
+            {
+                var touristRouteMappingDictionary = _propertyMappingService
+                    .GetPropertyMapping<TouristRouteDto, TouristRoute>();
+                result = result.ApplySort(orderBy, touristRouteMappingDictionary);
             }
             //include vs join
             return await PaginationList<TouristRoute>.CreateAsync(pageNumber, pageSize, result);
