@@ -50,6 +50,7 @@ namespace FakeXiecheng.API.Controllers
                 ResourceUriType.PreviousPage => _urlHelper.Link("GetTouristRoutes",
                     new
                     {
+                        fields = parameters.Fields,
                         orderBy = parameters.OrderBy,
                         keyword = parameters.Keyword,
                         rating = parameters.Rating,
@@ -59,6 +60,7 @@ namespace FakeXiecheng.API.Controllers
                 ResourceUriType.NextPage => _urlHelper.Link("GetTouristRoutes",
                     new
                     {
+                        fields = parameters.Fields,
                         orderBy = parameters.OrderBy,
                         keyword = parameters.Keyword,
                         rating = parameters.Rating,
@@ -68,6 +70,7 @@ namespace FakeXiecheng.API.Controllers
                 _ => _urlHelper.Link("GetTouristRoutes", 
                     new
                     {
+                        fields = parameters.Fields,
                         orderBy = parameters.OrderBy,
                         keyword = parameters.Keyword,
                         rating = parameters.Rating,
@@ -89,6 +92,11 @@ namespace FakeXiecheng.API.Controllers
             if (!_propertyMappingService.IsMappingExists<TouristRouteDto, TouristRoute>(paramaters.OrderBy))
             {
                 return BadRequest("please input the right orderby parameters");
+            }
+
+            if (!_propertyMappingService.IsPropertiesExists<TouristRouteDto>(paramaters.Fields))
+            {
+                return BadRequest("please type in the correct parameters");
             }
 
             var touristRoutesFromRepo 
@@ -130,12 +138,14 @@ namespace FakeXiecheng.API.Controllers
             Response.Headers.Add("x-pagination", 
                 Newtonsoft.Json.JsonConvert.SerializeObject(paginationMetadata));
 
-            return Ok(touristRouteDto);
+            return Ok(touristRouteDto.ShapeData(paramaters.Fields));
         }
 
         [HttpGet("{touristRouteId:Guid}", Name = "GetTouristRouteById")]
         [HttpHead]
-        public async Task<IActionResult> GetTouristRouteByIdAsync(Guid touristRouteId)
+        public async Task<IActionResult> GetTouristRouteByIdAsync(
+            Guid touristRouteId,
+            string fields)
         {
             var touristRouteFromRepo = await _touristRouteRepository.GetTouristRouteAsync(touristRouteId);
             if (touristRouteFromRepo == null)
@@ -145,7 +155,7 @@ namespace FakeXiecheng.API.Controllers
 
             var touristRouteDto = _mapper.Map<TouristRouteDto>(touristRouteFromRepo);
 
-            return Ok(touristRouteDto);
+            return Ok(touristRouteDto.ShapeData(fields));
         }
 
         [HttpPost]

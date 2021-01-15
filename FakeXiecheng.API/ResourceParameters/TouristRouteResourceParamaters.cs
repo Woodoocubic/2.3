@@ -33,5 +33,7 @@ namespace FakeXiecheng.API.ResourceParameters
                 _rating = value;
             }
         }
+
+        public string Fields { get; set; }
     }
 }

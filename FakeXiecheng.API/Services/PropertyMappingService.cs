@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using FakeXiecheng.API.Dtos;
 using FakeXiecheng.API.Models;
@@ -62,6 +63,31 @@ namespace FakeXiecheng.API.Services
                     : trimmedField.Remove(indexOfFirstSpace);
 
                 if (!propertyMapping.ContainsKey(propertyName))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public bool IsPropertiesExists<T>(string fields)
+        {
+            if (string.IsNullOrWhiteSpace(fields))
+            {
+                return true;
+            }
+
+            var fieldsAfterSplit = fields.Split(',');
+
+            foreach (var field in fieldsAfterSplit )
+            {
+                var propertyName = field.Trim();
+
+                var propertyInfo = typeof(T).GetProperty(propertyName,
+                    BindingFlags.Instance | BindingFlags.IgnoreCase | BindingFlags.Public);
+
+                if (propertyInfo == null)
                 {
                     return false;
                 }
