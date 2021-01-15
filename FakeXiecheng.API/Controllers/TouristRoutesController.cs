@@ -138,7 +138,47 @@ namespace FakeXiecheng.API.Controllers
             Response.Headers.Add("x-pagination", 
                 Newtonsoft.Json.JsonConvert.SerializeObject(paginationMetadata));
 
-            return Ok(touristRouteDto.ShapeData(paramaters.Fields));
+            var shapedDtoList = touristRouteDto.ShapeData(paramaters.Fields);
+            var linkDto = CreateLinksForTouristRouteList(paramaters, paramaters2);
+
+            var shapedDtoWithLinkList = shapedDtoList.Select(t =>
+            {
+                var touristRouteDictionary = t as IDictionary<string, object>;
+                var links = CreateLinkForTouristRoute((Guid) touristRouteDictionary["Id"], null);
+
+                touristRouteDictionary.Add("links", links);
+                return touristRouteDictionary;
+            });
+
+            var result = new
+            {
+                value = shapedDtoWithLinkList,
+                links = linkDto
+            };
+            
+            return Ok(result);
+        }
+
+        private IEnumerable<LinkDto> CreateLinksForTouristRouteList(
+            TouristRouteResourceParamaters parameters,
+            PaginationResourceParamaters parameters2
+            )
+        {
+            var links = new List<LinkDto>();
+            // ADD self
+            links.Add(new LinkDto(
+                GenerateTouristRouteResourceURL(parameters, parameters2, ResourceUriType.CurrentPage),
+                "self",
+                "GET"
+                ));
+            // "api/touristRoutes"
+            // create touristRoute
+            links.Add(new LinkDto(
+                Url.Link("CreateTouristRoute", null),
+                "create_tourist_route",
+                "POST"));
+
+            return links;
         }
 
         [HttpGet("{touristRouteId:Guid}", Name = "GetTouristRouteById")]
@@ -155,10 +195,53 @@ namespace FakeXiecheng.API.Controllers
 
             var touristRouteDto = _mapper.Map<TouristRouteDto>(touristRouteFromRepo);
 
-            return Ok(touristRouteDto.ShapeData(fields));
+            //return Ok(touristRouteDto.ShapeData(fields));
+            var linkDtos = CreateLinkForTouristRoute(touristRouteId, fields);
+            var result = touristRouteDto.ShapeData(fields)
+                as IDictionary<string, object>;
+            result.Add("links", linkDtos);
+            return Ok(result);
         }
 
-        [HttpPost]
+        private IEnumerable<LinkDto> CreateLinkForTouristRoute(
+            Guid touristRouteId,
+            string fields)
+        {
+            var links = new List<LinkDto>();
+
+            links.Add(
+                new LinkDto(
+                    Url.Link("GetTouristRouteById", new {touristRouteId, fields}),
+                    "self",
+                    "GET"));
+            //PUT
+            links.Add(
+                new LinkDto(
+                    Url.Link("PartiallyUpdateTouristRoute", new {touristRouteId}),
+                    "partially_update",
+                    "PATCH"
+                    ));
+            //DELETE
+            links.Add(
+                new LinkDto(
+                    Url.Link("DeleteTouristRoute", new {touristRouteId}),
+                    "delete",
+                    "DELETE"));
+            // GET TOURISTROUTE PIC
+            links.Add(new LinkDto(
+                Url.Link("GetPictureListForTouristRoute", new {touristRouteId}),
+                "get_picture",
+                "GET"));
+            //ADD NEW PIC
+            links.Add(new LinkDto(
+                Url.Link("CreateTouristRoutePicture", new {touristRouteId}),
+                "create_picture",
+                "POST"));
+
+            return links;
+        }
+
+        [HttpPost(Name = "CreateTouristRoute")]
         [Authorize(AuthenticationSchemes = "Bearer")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateTouristRouteAsync([FromBody] TouristRouteForCreationDto touristRouteForCreationDto)
@@ -168,13 +251,20 @@ namespace FakeXiecheng.API.Controllers
             await _touristRouteRepository.SaveAsync();
 
             var touristRouteToReturn = _mapper.Map<TouristRouteDto>(touristRouteModel);
+
+            var links = CreateLinkForTouristRoute(touristRouteModel.Id, null);
+            var result = touristRouteToReturn.ShapeData(null)
+                as IDictionary<string, object>;
+                
+            result.Add("links", links);
+
             return CreatedAtRoute(
                 "GetTouristRouteById",
-                new {touristRouteId = touristRouteToReturn.Id},
-                touristRouteToReturn);
+                new {touristRouteId = result["Id"]},
+                result);
         }
 
-        [HttpPut("{touristRouteId}")]
+        [HttpPut("{touristRouteId}", Name = "UpdateTouristRoute")]
         [Authorize(AuthenticationSchemes = "Bearer")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateTouristRoute(
@@ -197,7 +287,7 @@ namespace FakeXiecheng.API.Controllers
             return NoContent();
         }
 
-        [HttpPatch("{touristRouteId}")]
+        [HttpPatch("{touristRouteId}",Name = "PartiallyUpdateTouristRoute")]
         [Authorize(AuthenticationSchemes = "Bearer")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> PartiallyUpdateTouristRoute(
@@ -221,7 +311,7 @@ namespace FakeXiecheng.API.Controllers
 
             return NoContent();
         }
-        [HttpDelete("{touristRouteId}")]
+        [HttpDelete("{touristRouteId}", Name = "DeleteTouristRoute")]
         [Authorize(AuthenticationSchemes = "Bearer")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteTouristRoute([FromRoute] Guid touristRouteId)
