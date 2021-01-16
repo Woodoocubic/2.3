@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.Net.Http.Headers;
 
 namespace FakeXiecheng.API.Controllers
 {
@@ -80,15 +81,24 @@ namespace FakeXiecheng.API.Controllers
             };
         }
         //api/touristRoutes?keyword=input content
+        //1. application/json -> tourist route resource 
+        //2. application/vnd.{company name}.hateoas+json
         [HttpGet(Name = "GetTouristRoutes")]
         [HttpHead]
         public async Task<IActionResult> GetTouristRoutes(
             [FromQuery] TouristRouteResourceParamaters paramaters,
-            [FromQuery] PaginationResourceParamaters paramaters2
+            [FromQuery] PaginationResourceParamaters paramaters2,
+            [FromHeader(Name = "Accept")] string mediaType
             //[FromQuery] string keyword,
             //string rating //lessThan, largerThan, equalTo
             )//fromquery or frombody
         {
+            if (!MediaTypeHeaderValue.TryParse(
+                mediaType, out MediaTypeHeaderValue parsedMediatype))
+            {
+                return BadRequest();
+            }
+
             if (!_propertyMappingService.IsMappingExists<TouristRouteDto, TouristRoute>(paramaters.OrderBy))
             {
                 return BadRequest("please input the right orderby parameters");
@@ -139,24 +149,28 @@ namespace FakeXiecheng.API.Controllers
                 Newtonsoft.Json.JsonConvert.SerializeObject(paginationMetadata));
 
             var shapedDtoList = touristRouteDto.ShapeData(paramaters.Fields);
-            var linkDto = CreateLinksForTouristRouteList(paramaters, paramaters2);
-
-            var shapedDtoWithLinkList = shapedDtoList.Select(t =>
+            if (parsedMediatype.MediaType == "application/vnd.guangqing.hateoas+json")
             {
-                var touristRouteDictionary = t as IDictionary<string, object>;
-                var links = CreateLinkForTouristRoute((Guid) touristRouteDictionary["Id"], null);
+                var linkDto = CreateLinksForTouristRouteList(paramaters, paramaters2);
 
-                touristRouteDictionary.Add("links", links);
-                return touristRouteDictionary;
-            });
+                var shapedDtoWithLinkList = shapedDtoList.Select(t =>
+                {
+                    var touristRouteDictionary = t as IDictionary<string, object>;
+                    var links = CreateLinkForTouristRoute((Guid)touristRouteDictionary["Id"], null);
 
-            var result = new
-            {
-                value = shapedDtoWithLinkList,
-                links = linkDto
-            };
-            
-            return Ok(result);
+                    touristRouteDictionary.Add("links", links);
+                    return touristRouteDictionary;
+                });
+
+                var result = new
+                {
+                    value = shapedDtoWithLinkList,
+                    links = linkDto
+                };
+
+                return Ok(result);
+            }
+            return Ok(shapedDtoList);
         }
 
         private IEnumerable<LinkDto> CreateLinksForTouristRouteList(
