@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -83,6 +84,14 @@ namespace FakeXiecheng.API.Controllers
         //api/touristRoutes?keyword=input content
         //1. application/json -> tourist route resource 
         //2. application/vnd.{company name}.hateoas+json
+        //3. application/vnd.guangqing.touristRoute.simplify+json
+        //4. application/vnd.guangqing.touristRoute.simplify.hateoas+json
+        [Produces(
+            "application/json",
+            "application/vnd.guangqing.hateoas+json",
+            "application/vnd.guangqing.touristRoute.simplify+json",
+            "application/vnd.guangqing.touristRoute.simplify.hateoas+json"
+            )]
         [HttpGet(Name = "GetTouristRoutes")]
         [HttpHead]
         public async Task<IActionResult> GetTouristRoutes(
@@ -148,8 +157,35 @@ namespace FakeXiecheng.API.Controllers
             Response.Headers.Add("x-pagination", 
                 Newtonsoft.Json.JsonConvert.SerializeObject(paginationMetadata));
 
-            var shapedDtoList = touristRouteDto.ShapeData(paramaters.Fields);
-            if (parsedMediatype.MediaType == "application/vnd.guangqing.hateoas+json")
+            bool isHateoas = parsedMediatype.SubTypeWithoutSuffix
+                .EndsWith("hateoas", StringComparison.InvariantCultureIgnoreCase);
+
+            var primaryMediaType = isHateoas
+                ? parsedMediatype.SubTypeWithoutSuffix
+                    .Substring(0, parsedMediatype.SubTypeWithoutSuffix.Length - 8)
+                : parsedMediatype.SubTypeWithoutSuffix;
+            
+            //var shapedDtoList = touristRouteDto.ShapeData(paramaters.Fields);
+            IEnumerable<object> touristRoutesDto;
+            IEnumerable<ExpandoObject> shapedDtoList;
+
+            if (primaryMediaType == "vnd.guangqing.touristRoute.simplify")
+            {
+                touristRoutesDto = _mapper
+                    .Map<IEnumerable<TouristRouteSimplifyDto>>(touristRoutesFromRepo);
+
+                shapedDtoList = ((IEnumerable<TouristRouteSimplifyDto>) touristRoutesDto)
+                    .ShapeData(paramaters.Fields);
+            }
+            else
+            {
+                touristRoutesDto = _mapper
+                    .Map<IEnumerable<TouristRouteDto>>(touristRoutesFromRepo);
+                shapedDtoList = ((IEnumerable<TouristRouteDto>) touristRoutesDto)
+                    .ShapeData(paramaters.Fields);
+            }
+
+            if (isHateoas)
             {
                 var linkDto = CreateLinksForTouristRouteList(paramaters, paramaters2);
 
@@ -161,7 +197,6 @@ namespace FakeXiecheng.API.Controllers
                     touristRouteDictionary.Add("links", links);
                     return touristRouteDictionary;
                 });
-
                 var result = new
                 {
                     value = shapedDtoWithLinkList,
@@ -170,6 +205,7 @@ namespace FakeXiecheng.API.Controllers
 
                 return Ok(result);
             }
+
             return Ok(shapedDtoList);
         }
 
